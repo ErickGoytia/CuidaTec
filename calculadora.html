@@ -1,0 +1,51 @@
+<!doctype html><html lang="es"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Calculadora — CuidaTec</title>
+<link rel="stylesheet" href="assets/css/styles.css">
+<link rel="stylesheet" href="https://unpkg.com/aos@2.3.4/dist/aos.css">
+</head><body>
+<header class="container header">
+  <div class="brand"><div class="logo">💧</div><a href="index.html" class="brand-name">CuidaTec</a></div>
+  <nav class="nav">
+    <a href="index.html">Inicio</a>
+    <a href="reportar.html">Reportar</a>
+    <a href="calculadora.html">Calculadora</a>
+    <a href="consejos.html">Consejos</a>
+    <a href="contacto.html">Contacto</a>
+    <a href="login.html">Login</a>
+  </nav>
+  <div class="header-blob"></div>
+</header>
+<main class="container">
+  <div class="card" data-aos="fade-up"><h2>Calculadora</h2>
+    <div class="grid-2">
+      <label>Duchas/día <input id="duchas" type="number" value="1"></label>
+      <label>Min/ducha <input id="minDucha" type="number" value="8"></label>
+      <label>L/min regadera <input id="lpm" type="number" value="9"></label>
+      <label>Descargas WC <input id="wc" type="number" value="5"></label>
+      <label>L/descarga <input id="wcLitros" type="number" value="6"></label>
+      <label>Lavados/semana <input id="lavados" type="number" value="3"></label>
+      <label>L/lavado <input id="lavadoraLitros" type="number" value="70"></label>
+      <label>Riego min/día <input id="riegoMin" type="number" value="10"></label>
+      <label>Manguera L/min <input id="mangueraLpm" type="number" value="12"></label>
+    </div>
+    <button class="btn primary" id="calcular">Calcular</button>
+    <h3 id="resultado" data-aos="zoom-in">Consumo estimado: 0 L/día</h3>
+    <ul id="tips"></ul>
+  </div>
+</main>
+<script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script>
+<script>document.addEventListener('DOMContentLoaded',()=>AOS.init({ once:true, duration:700, easing:'ease-out' }));</script>
+<script>
+document.getElementById('calcular').onclick=()=>{
+  const n=id=>Number(document.getElementById(id).value||0)
+  const total = n('duchas')*n('minDucha')*n('lpm') + n('wc')*n('wcLitros') + (n('lavados')*n('lavadoraLitros'))/7 + n('riegoMin')*n('mangueraLpm')
+  document.getElementById('resultado').textContent='Consumo estimado: '+Math.round(total)+' L/día'
+  const tips=document.getElementById('tips'); tips.innerHTML=''
+  if(n('minDucha')>6) tips.innerHTML+='<li>Reduce 2 min</li>'
+  if(n('lpm')>9) tips.innerHTML+='<li>Usa regadera 6–9 L/min</li>'
+  if(n('wcLitros')>6) tips.innerHTML+='<li>WC 4.8–6 L/descarga</li>'
+  if(n('riegoMin')>0) tips.innerHTML+='<li>Riega al amanecer/noche</li>'
+}
+</script>
+</body></html>

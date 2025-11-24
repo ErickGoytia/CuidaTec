@@ -1,0 +1,47 @@
+<!doctype html><html lang="es"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CuidaTec — Cuidado del Agua</title>
+<link rel="stylesheet" href="assets/css/styles.css">
+<link rel="stylesheet" href="https://unpkg.com/aos@2.3.4/dist/aos.css">
+</head><body>
+<header class="container header">
+  <div class="brand"><div class="logo">💧</div><a href="index.html" class="brand-name">CuidaTec</a></div>
+  <nav class="nav">
+    <a href="index.html">Inicio</a>
+    <a href="reportar.html">Reportar</a>
+    <a href="calculadora.html">Calculadora</a>
+    <a href="consejos.html">Consejos</a>
+    <a href="contacto.html">Contacto</a>
+    <a href="login.html">Login</a>
+  </nav>
+  <div class="header-blob"></div>
+</header>
+<main class="container">
+  <section class="hero">
+    <div data-aos="fade-right">
+      <span class="badge">Juvenil · Tecnológico</span>
+      <h1>Cuida el agua con estilo</h1>
+      <p>Reporta fugas, aprende consejos, y mide tu consumo. Menos bla, más acción.</p>
+      <div class="hero-cta">
+        <a class="btn primary" href="reportar.html">Reportar fuga</a>
+        <a class="btn" href="calculadora.html">Calcular consumo</a>
+      </div>
+    </div>
+    <div class="card" data-aos="zoom-in">
+      <b>Sesión:</b> <span id="whoami">anónimo</span>
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <a class="btn" href="login.html">Cambiar Sesion</a>
+        <button class="btn" id="logoutBtn">Salir</button>
+      </div>
+    </div>
+  </section>
+</main>
+<script src="assets/js/main.js"></script>
+<script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script>
+<script>document.addEventListener('DOMContentLoaded',()=>AOS.init({ once:true, duration:700, easing:'ease-out' }));</script>
+<script>
+document.getElementById('logoutBtn').onclick=()=>{ sessionStorage.removeItem('token'); sessionStorage.removeItem('role'); location.reload() }
+const r = sessionStorage.getItem('role')||'guest'
+document.getElementById('whoami').textContent = r==='admin'?'Admin':(r==='user'?'Usuario':'Anónimo')
+</script>
+</body></html>

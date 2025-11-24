@@ -1,0 +1,37 @@
+<!doctype html><html lang="es"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Consejos — CuidaTec</title>
+<link rel="stylesheet" href="assets/css/styles.css">
+<link rel="stylesheet" href="https://unpkg.com/aos@2.3.4/dist/aos.css">
+</head><body>
+<header class="container header">
+  <div class="brand"><div class="logo">💧</div><a href="index.html" class="brand-name">CuidaTec</a></div>
+  <nav class="nav">
+    <a href="index.html">Inicio</a>
+    <a href="reportar.html">Reportar</a>
+    <a href="calculadora.html">Calculadora</a>
+    <a href="consejos.html">Consejos</a>
+    <a href="contacto.html">Contacto</a>
+    <a href="login.html">Login</a>
+  </nav>
+  <div class="header-blob"></div>
+</header>
+<main class="container">
+  <div class="card" data-aos="fade-up">
+    <h2>Consejos</h2>
+    <ul id="lista"></ul>
+  </div>
+</main>
+<script src="assets/js/main.js"></script>
+<script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script>
+<script>document.addEventListener('DOMContentLoaded',()=>AOS.init({ once:true, duration:700, easing:'ease-out' }));</script>
+<script>
+const API = window.API_BASE
+async function load(){
+  const ul=document.getElementById('lista'); ul.innerHTML='Cargando...'
+  try{ const res=await fetch(API + '/api/tips'); const data=await res.json(); ul.innerHTML=''; data.forEach(x=>{ const li=document.createElement('li'); li.textContent = x.titulo+': '+x.descripcion; ul.appendChild(li) }) }
+  catch{ ul.textContent='No disponible' }
+}
+load()
+</script>
+</body></html>

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Login — CuidaTec</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <link rel="stylesheet" href="https://unpkg.com/aos@2.3.4/dist/aos.css">
+  <style>
+    .login-wrap { min-height: 70vh; display: grid; place-items: center; padding: 24px; }
+    .login-card { max-width: 520px; width: 100%; }
+    .grid-2-login { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .grid-2-login label { display:block; }
+    .grid-2-login input { width:100%; }
+    @media (max-width: 640px) {
+      .grid-2-login { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container login-wrap">
+    <div class="card login-card" data-aos="zoom-in">
+      <h2 style="margin-top:0">Iniciar sesión</h2>
+
+      <form id="loginForm" class="form" autocomplete="on">
+        <div class="grid-2-login" style="align-items:end">
+          <label>Usuario
+            <input id="user" name="user" required placeholder="admin o usuario" autofocus>
+          </label>
+          <label>Contraseña
+            <input id="pass" name="pass" type="password" required placeholder="teclag">
+          </label>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
+          <button class="btn primary" type="submit">Entrar</button>
+          <button class="btn" type="button" id="demoUser">Demo usuario</button>
+          <button class="btn" type="button" id="demoAdmin">Demo admin</button>
+        </div>
+
+        <p id="msg" class="muted" style="margin-top:10px"></p>
+      </form>
+    </div>
+  </main>
+
+  <script src="assets/js/main.js"></script>
+  <script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => AOS.init({ once:true, duration:700, easing:'ease-out' }));
+
+    const API = (window.API_BASE && window.API_BASE.replace('https://','http://')) || 'http://127.0.0.1:9090';
+
+    const form   = document.getElementById('loginForm');
+    const msg    = document.getElementById('msg');
+    const btnU   = document.getElementById('demoUser');
+    const btnA   = document.getElementById('demoAdmin');
+    const inpU   = document.getElementById('user');
+    const inpP   = document.getElementById('pass');
+
+    btnU.onclick = () => { inpU.value = 'usuario'; inpP.value = 'teclag'; doLogin('usuario','teclag'); };
+    btnA.onclick = () => { inpU.value = 'admin';   inpP.value = 'teclag'; doLogin('admin','teclag'); };
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const u = inpU.value;
+      const p = inpP.value;
+      doLogin(u, p);
+    });
+
+    async function doLogin(u, p){
+      msg.textContent = '';
+      const payload = {
+        username: String(u || '').trim(),
+        password: String(p || '')
+      };
+      console.log('[login] payload que se envía:', payload);
+
+      if (!payload.username || !payload.password) {
+        msg.textContent = 'Escribe usuario y contraseña';
+        return;
+      }
+
+      try{
+        const res = await fetch(API + '/api/login', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const text = await res.text();
+        console.log('[login] status', res.status, text);
+
+        if (!res.ok) {
+          msg.textContent = (res.status === 401)
+            ? 'Credenciales inválidas'
+            : 'No se pudo conectar con la API';
+          return;
+        }
+
+        const j = JSON.parse(text);
+        if (!j.token || !j.role) {
+          msg.textContent = 'Respuesta inválida del servidor';
+          console.warn('[login] payload raro', j);
+          return;
+        }
+
+        sessionStorage.setItem('token', j.token);
+        sessionStorage.setItem('role',  j.role);
+        location.href = (j.role === 'admin') ? 'admin.html' : 'index.html';
+      }catch(err){
+        console.error('[login] error', err);
+        msg.textContent = 'No se pudo conectar con la API';
+      }
+    }
+  </script>
+</body>
+</html>

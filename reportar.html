@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Reportar fuga — CuidaTec</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <link rel="stylesheet" href="https://unpkg.com/aos@2.3.4/dist/aos.css">
+</head>
+<body>
+<header class="container header">
+  <div class="brand">
+    <div class="logo">💧</div>
+    <a href="index.html" class="brand-name">CuidaTec</a>
+  </div>
+  <nav class="nav">
+    <a href="index.html">Inicio</a>
+    <a href="reportar.html">Reportar</a>
+    <a href="calculadora.html">Calculadora</a>
+    <a href="consejos.html">Consejos</a>
+    <a href="contacto.html">Contacto</a>
+  </nav>
+  <div class="header-blob"></div>
+</header>
+
+<main class="container">
+  <div class="card" data-aos="fade-up">
+    <h1>Reportar fuga</h1>
+    <p class="muted">Cuéntanos dónde está la fuga o desperdicio de agua. Los campos de nombre y contacto son opcionales, pero ayudan a dar seguimiento.</p>
+
+    <form id="frmReporte" class="form" autocomplete="off">
+      <div class="grid-2">
+        <label>
+          Tu nombre (opcional)
+          <input type="text" name="reportante_nombre" id="reportante_nombre" placeholder="Ej. Diego">
+        </label>
+        <label>
+          Contacto (opcional)
+          <input type="text" name="reportante_contacto" id="reportante_contacto" placeholder="Teléfono o correo">
+        </label>
+      </div>
+
+      <label>
+        Ubicación (calle) *
+        <input type="text" name="calle" id="calle" required placeholder="Ej. Alfredo Nobel 49">
+      </label>
+
+      <div class="grid-2">
+        <label>
+          Colonia
+          <input type="text" name="colonia" id="colonia" placeholder="Colonia">
+        </label>
+        <label>
+          Código Postal
+          <input type="text" name="codigo_postal" id="codigo_postal" placeholder="CP">
+        </label>
+      </div>
+
+      <label>
+        Referencias
+        <textarea name="referencias" id="referencias" rows="2" placeholder="Puntos de referencia cercanos"></textarea>
+      </label>
+
+      <label>
+        Descripción *
+        <textarea name="descripcion" id="descripcion" rows="4" required placeholder="Describe la fuga, su tamaño, si está en banqueta, calle, patio, etc."></textarea>
+      </label>
+
+      <div class="grid-2">
+        <label>
+          Categoría (opcional)
+          <select name="categoria_id" id="categoria_id">
+            <option value="">Selecciona una categoría</option>
+            <option value="1">Fuga en red pública</option>
+            <option value="2">Fuga en domicilio</option>
+            <option value="3">Llave / hidratante</option>
+            <option value="4">Otro</option>
+          </select>
+        </label>
+        <label>
+          Severidad (opcional)
+          <select name="severidad_id" id="severidad_id">
+            <option value="">Selecciona severidad</option>
+            <option value="1">Baja</option>
+            <option value="2">Media</option>
+            <option value="3">Alta</option>
+          </select>
+        </label>
+      </div>
+
+      <button type="submit" class="btn primary" id="btnEnviar">Enviar</button>
+      <p id="msg" class="muted"></p>
+    </form>
+  </div>
+</main>
+
+<script src="assets/js/main.js"></script>
+<script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  AOS.init({ once:true, duration:700, easing:'ease-out' });
+
+  const API = window.API_BASE || 'http://127.0.0.1:9090';
+  const form = document.getElementById('frmReporte');
+  const msg  = document.getElementById('msg');
+  const btn  = document.getElementById('btnEnviar');
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    msg.textContent = '';
+    btn.disabled = true;
+    btn.textContent = 'Enviando…';
+
+    const payload = {
+      reportante_nombre   : form.reportante_nombre.value.trim() || null,
+      reportante_contacto : form.reportante_contacto.value.trim() || null,
+      calle               : form.calle.value.trim(),
+      colonia             : form.colonia.value.trim() || null,
+      codigo_postal       : form.codigo_postal.value.trim() || null,
+      referencias         : form.referencias.value.trim() || null,
+      descripcion         : form.descripcion.value.trim(),
+      categoria_id        : form.categoria_id.value ? Number(form.categoria_id.value) : null,
+      severidad_id        : form.severidad_id.value ? Number(form.severidad_id.value) : null
+      // titulo se genera en el backend
+    };
+
+    if (!payload.calle || !payload.descripcion) {
+      msg.textContent = 'La ubicación (calle) y la descripción son obligatorias.';
+      btn.disabled = false;
+      btn.textContent = 'Enviar';
+      return;
+    }
+
+    try {
+      const res = await fetch(API + '/api/reports', {
+        method : 'POST',
+        headers: { 'Content-Type':'application/json' },
+        body   : JSON.stringify(payload)
+      });
+
+      let data = null;
+      try {
+        data = await res.json();
+      } catch (_) {
+        // si no es JSON, lo ignoramos
+      }
+
+      if (!res.ok) {
+        console.error('Error HTTP', res.status, data);
+        if (data && data.error) {
+          msg.textContent = 'Error al enviar: ' + data.error;
+        } else {
+          msg.textContent = 'Error al enviar (HTTP ' + res.status + ').';
+        }
+      } else {
+        msg.textContent = 'Reporte enviado. ¡Gracias por ayudar a cuidar el agua!';
+        form.reset();
+      }
+    } catch (err) {
+      console.error(err);
+      msg.textContent = 'No se pudo conectar con la API.';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Enviar';
+    }
+  });
+});
+</script>
+
+</body>
+</html>

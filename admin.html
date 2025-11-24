@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Admin — CuidaTec</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <link rel="stylesheet" href="https://unpkg.com/aos@2.3.4/dist/aos.css">
+
+  <style>
+    .admin-badges{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      font-size:12px;
+    }
+    .admin-badge{
+      border-radius:999px;
+      padding:3px 10px;
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(10,20,30,.9);
+    }
+    .table-admin th, .table-admin td{
+      font-size:13px;
+      vertical-align:middle;
+    }
+    .status-badge{
+      display:inline-flex;
+      align-items:center;
+      gap:4px;
+      padding:2px 9px;
+      border-radius:999px;
+      font-size:11px;
+      border:1px solid rgba(148,163,184,0.4);
+      background:rgba(15,23,42,0.9);
+    }
+    .status-nuevo, .status-pendiente{
+      border-color:rgba(59,130,246,0.7);
+      background:rgba(37,99,235,0.25);
+      color:#dbeafe;
+    }
+    .status-en_proceso, .status-en-proceso{
+      border-color:rgba(234,179,8,0.8);
+      background:rgba(234,179,8,0.25);
+      color:#facc15;
+    }
+    .status-resuelto, .status-cerrado{
+      border-color:rgba(52,211,153,0.85);
+      background:rgba(16,185,129,0.25);
+      color:#bbf7d0;
+    }
+  </style>
+</head>
+
+<body>
+<header class="container header">
+  <div class="brand">
+    <div class="logo">💧</div>
+    <a href="index.html" class="brand-name">CuidaTec</a>
+  </div>
+  <nav class="nav">
+    <a href="index.html">Inicio</a>
+    <a href="reportar.html">Reportar</a>
+    <a href="calculadora.html">Calculadora</a>
+    <a href="consejos.html">Consejos</a>
+    <a href="contacto.html">Contacto</a>
+  </nav>
+  <div class="header-blob"></div>
+</header>
+
+<main class="container">
+  <div class="topbar" data-aos="fade">
+    <div>
+      <h2 style="margin:0">Panel administrador</h2>
+      <div class="admin-badges">
+        <span class="admin-badge">Gestión de reportes</span>
+        <span class="admin-badge">Asignaciones</span>
+        <span class="admin-badge">Historial</span>
+      </div>
+    </div>
+    <div>
+      <button id="btnRefresh" class="btn">Refrescar</button>
+      <button id="btnExport"  class="btn">Exportar CSV</button>
+      <button id="btnLogout"  class="btn">Salir</button>
+    </div>
+  </div>
+
+  <div class="card" data-aos="fade-up">
+    <table class="table table-admin" id="tbl">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Folio</th>
+          <th>Título</th>
+          <th>Estado</th>
+          <th>Fecha</th>
+          <th>Detalle</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <p id="msg" class="muted"></p>
+  </div>
+</main>
+
+<!-- PANEL DETALLE -->
+<div id="detailPanel" style="
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.55);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:50;
+">
+  <div style="
+    width:min(95vw,900px);
+    max-height:90vh;
+    overflow:auto;
+    background:linear-gradient(180deg,rgba(10,15,25,.97),rgba(5,8,14,.97));
+    border-radius:18px;
+    border:1px solid var(--c-border);
+    padding:18px;
+  ">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <h3 id="detailTitle" style="margin:0">Detalle del reporte</h3>
+      <button class="btn" id="detailClose">Cerrar</button>
+    </div>
+
+    <div id="detailContent" class="muted" style="font-size:13px"></div>
+  </div>
+</div>
+
+<script src="assets/js/main.js"></script>
+<script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+  /* ------------------------------
+        CONFIG & AUTH
+  ------------------------------- */
+  AOS.init({ once:true, duration:700, easing:'ease-out' });
+
+  const API   = window.API_BASE || 'http://127.0.0.1:9090';
+  const token = sessionStorage.getItem('token');
+
+  if (!token) return location.href = 'login.html';
+
+  const tbody        = document.querySelector('#tbl tbody');
+  const msg          = document.getElementById('msg');
+  const btnLogout    = document.getElementById('btnLogout');
+  const btnRefresh   = document.getElementById('btnRefresh');
+  const btnExport    = document.getElementById('btnExport');
+  const detailPanel  = document.getElementById('detailPanel');
+  const detailContent= document.getElementById('detailContent');
+  const detailClose  = document.getElementById('detailClose');
+  const detailTitle  = document.getElementById('detailTitle');
+
+  btnLogout.onclick = () => {
+    sessionStorage.clear();
+    location.href = 'login.html';
+  };
+
+  btnRefresh.onclick = () => load();
+  btnExport.onclick  = () => exportCSV();
+
+  detailClose.onclick = () => detailPanel.style.display = 'none';
+  detailPanel.addEventListener('click', e => {
+    if (e.target === detailPanel) detailPanel.style.display = 'none';
+  });
+
+  function escapeHtml(s){
+    return (s || '').toString().replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+  }
+
+  /* ------------------------------
+        LISTAR REPORTES
+  ------------------------------- */
+  async function load(){
+    tbody.innerHTML = '';
+    msg.textContent = '';
+
+    try{
+      const res = await fetch(API + '/api/reports', {
+        headers:{ Authorization:'Bearer ' + token }
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        sessionStorage.clear();
+        location.href = 'login.html';
+        return;
+      }
+
+      const data = await res.json();
+      if (!data.length) {
+        msg.textContent = 'Sin datos disponibles';
+        return;
+      }
+
+      data.forEach(r => {
+        const tr = document.createElement('tr');
+        const estadoText = r.estado || '';
+        const estadoKey  = estadoText.toLowerCase().replace(/\s+/g,'_');
+
+        tr.innerHTML = `
+          <td>${r.reporte_id}</td>
+          <td>${r.folio || ''}</td>
+          <td>${escapeHtml(r.titulo || '')}</td>
+          <td><span class="status-badge status-${estadoKey}">${estadoText}</span></td>
+          <td>${r.fecha_reporte || ''}</td>
+          <td><button class="btn" data-detail="${r.reporte_id}">Ver</button></td>
+          <td>
+            <button class="btn" data-id="${r.reporte_id}">Resolver</button>
+            <button class="btn" data-delete="${r.reporte_id}">Borrar</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      /* Botón resolver */
+      tbody.querySelectorAll('button[data-id]').forEach(btn => {
+        btn.addEventListener('click', async e => {
+          const id = e.target.getAttribute('data-id');
+          const res = await fetch(API + '/api/reports/' + id + '/resolve', {
+            method:'PATCH',
+            headers:{ Authorization:'Bearer ' + token }
+          });
+          if (res.ok) load();
+        });
+      });
+
+      /* Botón detalle */
+      tbody.querySelectorAll('button[data-detail]').forEach(btn => {
+        btn.addEventListener('click', () => showDetail(btn.getAttribute('data-detail')));
+      });
+
+      /* Botón borrar (soft delete) */
+      tbody.querySelectorAll('button[data-delete]').forEach(btn => {
+        btn.addEventListener('click', async e => {
+
+          const id = e.target.getAttribute('data-delete');
+
+          if (!confirm(`¿Borrar el reporte #${id}?`)) return;
+
+          const res = await fetch(API + '/api/reports/' + id, {
+            method:'DELETE',
+            headers:{ Authorization:'Bearer ' + token }
+          });
+
+          if (res.ok) load();
+          else alert('No se pudo borrar el reporte.');
+        });
+      });
+
+    }catch(err){
+      console.error(err);
+      msg.textContent = 'Error al cargar reportes.';
+    }
+  }
+
+  /* ------------------------------
+        EXPORTAR CSV
+  ------------------------------- */
+  function exportCSV(){
+    const rows = Array.from(tbody.querySelectorAll('tr'))
+      .map(tr => Array.from(tr.children).slice(0,5).map(td => td.textContent));
+
+    if (!rows.length) return alert('No hay datos.');
+
+    const header = ['ID','Folio','Título','Estado','Fecha'];
+    const csv = [header].concat(rows)
+      .map(r => r.map(x => JSON.stringify(x || '')).join(','))
+      .join('\n');
+
+    const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'reportes.csv';
+    a.click();
+  }
+
+  /* ------------------------------
+        DETALLE DE REPORTE
+  ------------------------------- */
+  async function showDetail(id){
+    detailContent.innerHTML = 'Cargando...';
+    detailPanel.style.display = 'flex';
+
+    try{
+      const res = await fetch(API + '/api/reports/' + id + '/detail', {
+        headers:{ Authorization:'Bearer ' + token }
+      });
+
+      if (!res.ok){
+        detailContent.textContent = 'Error cargando detalles.';
+        return;
+      }
+
+      const { info, historial, asignaciones } = await res.json();
+
+      let html = `
+        <p><b>Folio:</b> ${info.folio || ''}</p>
+        <p><b>Título:</b> ${escapeHtml(info.titulo || '')}</p>
+        <p><b>Descripción:</b><br>${escapeHtml(info.descripcion || '')}</p>
+        <p><b>Estado:</b> ${info.estado} · <b>Severidad:</b> ${info.severidad} · <b>Categoría:</b> ${info.categoria}</p>
+        <p><b>Ubicación:</b> ${escapeHtml(info.calle)} ${escapeHtml(info.colonia)} ${escapeHtml(info.codigo_postal)}</p>
+        <p><b>Referencias:</b> ${escapeHtml(info.referencias)}</p>
+        <p><b>Reportante:</b> ${escapeHtml(info.reportante_nombre || 'Anónimo')} (${escapeHtml(info.reportante_contacto || 'N/D')})</p>
+        <p><b>Fecha reporte:</b> ${info.fecha_reporte} · <b>Fecha cierre:</b> ${info.fecha_cierre || 'Sin cerrar'}</p>
+        <hr><h4>Historial</h4>
+      `;
+
+      if (!historial.length){
+        html += `<p>Sin historial registrado.</p>`;
+      } else {
+        html += `<ul>`;
+        historial.forEach(h => {
+          html += `<li><b>${h.fecha_cambio}:</b> ${h.estado_anterior} → ${h.estado_nuevo} (${escapeHtml(h.observaciones || '')})</li>`;
+        });
+        html += `</ul>`;
+      }
+
+      html += `<hr><h4>Asignaciones</h4>`;
+      if (!asignaciones.length){
+        html += `<p>Sin asignaciones.</p>`;
+      } else {
+        html += `<ul>`;
+        asignaciones.forEach(a => {
+          const nombre = a.estudiante_nombre || a.responsable;
+          const extra  = a.matricula ? ` [${a.matricula}]` : '';
+          html += `<li><b>${a.fecha_asignacion}:</b> ${escapeHtml(nombre + extra)} (${escapeHtml(a.correo || '')})</li>`;
+        });
+        html += `</ul>`;
+      }
+
+      html += `
+        <hr>
+        <h4>Asignar brigada / responsable</h4>
+        <div id="assignArea">
+          <p class="muted">Selecciona una brigada o escribe un responsable.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <select id="assignStudent" style="flex:1;min-width:200px"></select>
+            <input id="assignResponsable" placeholder="Responsable (opcional)" style="flex:1;min-width:200px">
+          </div>
+          <button class="btn" id="assignBtn">Asignar</button>
+          <p id="assignMsg" class="muted"></p>
+        </div>
+      `;
+
+      detailContent.innerHTML = html;
+      detailTitle.textContent = `Reporte #${info.reporte_id}`;
+
+      await fillStudents(id);
+
+    }catch(err){
+      console.error(err);
+      detailContent.textContent = 'Error al mostrar detalle.';
+    }
+  }
+
+  /* ------------------------------
+        LLENAR SELECT DE BRIGADAS
+  ------------------------------- */
+  async function fillStudents(reporteId){
+    const sel   = document.getElementById('assignStudent');
+    const msgEl = document.getElementById('assignMsg');
+    const btn   = document.getElementById('assignBtn');
+    const resp  = document.getElementById('assignResponsable');
+
+    sel.innerHTML = '<option value="">(Selecciona brigada)</option>';
+
+    try{
+      const res = await fetch(API + '/api/students', {
+        headers:{ Authorization:'Bearer ' + token }
+      });
+      const data = await res.json();
+
+      data.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.estudiante_id;
+        opt.textContent = `${s.nombre} (${s.matricula})`;
+        sel.appendChild(opt);
+      });
+
+    }catch(e){
+      msgEl.textContent = 'No se pudieron cargar brigadas.';
+      return;
+    }
+
+    btn.onclick = async () => {
+      msgEl.textContent = '';
+      const estudiante_id = sel.value ? Number(sel.value) : null;
+      const responsable   = resp.value.trim() || null;
+
+      if (!estudiante_id && !responsable){
+        msgEl.textContent = 'Selecciona brigada o escribe responsable.';
+        return;
+      }
+
+      const res = await fetch(API + '/api/reports/' + reporteId + '/assign', {
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          Authorization:'Bearer ' + token
+        },
+        body: JSON.stringify({ estudiante_id, responsable })
+      });
+
+      if (res.ok){
+        msgEl.textContent = 'Asignación registrada.';
+        showDetail(reporteId);
+      } else {
+        msgEl.textContent = 'No se pudo asignar.';
+      }
+    };
+  }
+
+  load();
+});
+</script>
+
+</body>
+</html>
