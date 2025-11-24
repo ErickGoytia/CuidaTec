@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Admin — CuidaTec</title>
   <link rel="stylesheet" href="assets/css/styles.css">
+  <link rel="stylesheet" href="https://unpkg.com/aos@2.3.4/dist/aos.css">
+
   <style>
     .admin-badges{
       display:flex;
@@ -22,41 +24,30 @@
       font-size:13px;
       vertical-align:middle;
     }
-    .tabs{
-      display:flex;
-      gap:8px;
-      margin:12px 0;
-      flex-wrap:wrap;
-    }
-    .tab{
-      padding:6px 12px;
-      border-radius:999px;
-      border:1px solid rgba(255,255,255,.12);
-      background:rgba(5,10,18,.9);
-      cursor:pointer;
-      font-size:13px;
-    }
-    .tab.active{
-      border-color:var(--c-accent);
-      background:rgba(10,40,55,.95);
-    }
     .status-badge{
-      padding:2px 8px;
+      display:inline-flex;
+      align-items:center;
+      gap:4px;
+      padding:2px 9px;
       border-radius:999px;
       font-size:11px;
-      border:1px solid rgba(255,255,255,.14);
+      border:1px solid rgba(148,163,184,0.4);
+      background:rgba(15,23,42,0.9);
     }
-    .status-nuevo{
-      background:rgba(0,180,255,.15);
-      color:#7fd8ff;
+    .status-nuevo, .status-pendiente{
+      border-color:rgba(59,130,246,0.7);
+      background:rgba(37,99,235,0.25);
+      color:#dbeafe;
     }
-    .status_en_proceso{
-      background:rgba(255,210,0,.12);
-      color:#ffe38c;
+    .status-en_proceso, .status-en-proceso{
+      border-color:rgba(234,179,8,0.8);
+      background:rgba(234,179,8,0.25);
+      color:#facc15;
     }
-    .status-resuelto{
-      background:rgba(40,220,120,.15);
-      color:#a4f7c7;
+    .status-resuelto, .status-cerrado{
+      border-color:rgba(52,211,153,0.85);
+      background:rgba(16,185,129,0.25);
+      color:#bbf7d0;
     }
   </style>
 </head>
@@ -78,18 +69,13 @@
 </header>
 
 <main class="container">
-  <div class="topbar">
+  <div class="topbar" data-aos="fade">
     <div>
       <h2 style="margin:0">Panel administrador</h2>
       <div class="admin-badges">
-        <span class="admin-badge">CuidaTec · Gestión de reportes</span>
-        <span class="admin-badge">Estados y severidad</span>
-        <span class="admin-badge">Acciones rápidas</span>
-      </div>
-      <div class="tabs">
-        <button class="tab active" data-tab="reportes">Gestión de reportes</button>
-        <button class="tab" data-tab="asignaciones" disabled>Asignaciones (demo)</button>
-        <button class="tab" data-tab="historial" disabled>Historial (demo)</button>
+        <span class="admin-badge">Gestión de reportes</span>
+        <span class="admin-badge">Asignaciones</span>
+        <span class="admin-badge">Historial</span>
       </div>
     </div>
     <div>
@@ -99,8 +85,8 @@
     </div>
   </div>
 
-  <div class="card">
-    <table class="table table-admin" id="tblReportes">
+  <div class="card" data-aos="fade-up">
+    <table class="table table-admin" id="tbl">
       <thead>
         <tr>
           <th>ID</th>
@@ -114,16 +100,20 @@
       </thead>
       <tbody></tbody>
     </table>
-    <p id="msgAdmin" class="muted"></p>
+    <p id="msg" class="muted"></p>
   </div>
 </main>
 
-<!-- Panel flotante de detalle -->
+<!-- PANEL DETALLE -->
 <div id="detailPanel" style="
-  position:fixed; inset:0;
+  position:fixed;
+  inset:0;
   background:rgba(0,0,0,0.55);
-  display:none; align-items:center; justify-content:center;
-  z-index:50;">
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:50;
+">
   <div style="
     width:min(95vw,900px);
     max-height:90vh;
@@ -131,269 +121,344 @@
     background:linear-gradient(180deg,rgba(10,15,25,.97),rgba(5,8,14,.97));
     border-radius:18px;
     border:1px solid var(--c-border);
-    padding:18px;">
+    padding:18px;
+  ">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <h3 id="detailTitle" style="margin:0">Detalle del reporte</h3>
       <button class="btn" id="detailClose">Cerrar</button>
     </div>
+
     <div id="detailContent" class="muted" style="font-size:13px"></div>
   </div>
 </div>
 
 <script src="assets/js/main.js"></script>
+<script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script>
+
 <script>
-(function(){
-  const API   = window.API_BASE;
-  const $     = sel => document.querySelector(sel);
-  const $$    = sel => Array.from(document.querySelectorAll(sel));
+document.addEventListener('DOMContentLoaded', () => {
+  AOS.init({ once:true, duration:700, easing:'ease-out' });
 
-  const token = sessionStorage.getItem("token");
-  const role  = sessionStorage.getItem("role");
+  // API: limpia barras finales por seguridad
+  const API   = (window.API_BASE || 'http://127.0.0.1:9090').replace(/\/+$/, '');
+  const token = sessionStorage.getItem('token');
+  const role  = sessionStorage.getItem('role');
 
-  if (!token || role !== "admin") {
-    // Si no está logueado como admin, mandarlo al login
-    location.href = "login.html";
-    return;
+  // Solo admins
+  if (!token || role !== 'admin') {
+    sessionStorage.clear();
+    return location.href = 'login.html';
   }
 
-  const tbody      = $("#tblReportes tbody");
-  const msg        = $("#msgAdmin");
-  const btnRefresh = $("#btnRefresh");
-  const btnExport  = $("#btnExport");
-  const btnLogout  = $("#btnLogout");
-
-  const detailPanel   = $("#detailPanel");
-  const detailContent = $("#detailContent");
-  const detailTitle   = $("#detailTitle");
-  const detailClose   = $("#detailClose");
-
-  console.log("[ADMIN] API =", API);
+  const tbody         = document.querySelector('#tbl tbody');
+  const msg           = document.getElementById('msg');
+  const btnLogout     = document.getElementById('btnLogout');
+  const btnRefresh    = document.getElementById('btnRefresh');
+  const btnExport     = document.getElementById('btnExport');
+  const detailPanel   = document.getElementById('detailPanel');
+  const detailContent = document.getElementById('detailContent');
+  const detailClose   = document.getElementById('detailClose');
+  const detailTitle   = document.getElementById('detailTitle');
 
   btnLogout.onclick = () => {
-    sessionStorage.removeItem("token");
-    sessionStorage.removeItem("role");
-    location.href = "login.html";
+    sessionStorage.clear();
+    location.href = 'login.html';
   };
 
-  btnRefresh.onclick = loadReportes;
-  btnExport.onclick  = exportCSV;
+  btnRefresh.onclick = () => load();
+  btnExport.onclick  = () => exportCSV();
 
-  detailClose.onclick = () => detailPanel.style.display = "none";
-  detailPanel.addEventListener("click", e => {
-    if (e.target === detailPanel) detailPanel.style.display = "none";
+  detailClose.onclick = () => detailPanel.style.display = 'none';
+  detailPanel.addEventListener('click', e => {
+    if (e.target === detailPanel) detailPanel.style.display = 'none';
   });
 
-  function esc(s){
-    return (s || "").toString().replace(/[&<>"']/g, c => ({
-      "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
+  function escapeHtml(s){
+    return (s || '').toString().replace(/[&<>"']/g, c => ({
+      '&':'&amp;',
+      '<':'&lt;',
+      '>':'&gt;',
+      '"':'&quot;',
+      "'":'&#39;'
     }[c]));
   }
 
-  function estadoClass(nombre){
-    if (!nombre) return "";
-    const t = nombre.toLowerCase();
-    if (t.includes("nuevo")) return "status-nuevo";
-    if (t.includes("proceso")) return "status_en_proceso";
-    if (t.includes("resuelto")) return "status-resuelto";
-    return "";
-  }
-
-  async function loadReportes(){
-    tbody.innerHTML = "";
-    msg.textContent = "";
+  /* ------------------------------
+        LISTAR REPORTES
+  ------------------------------- */
+  async function load(){
+    tbody.innerHTML = '';
+    msg.textContent = '';
 
     try{
-      const res = await fetch(API + "/api/reports", {
-        headers:{ Authorization:"Bearer " + token }
+      const res = await fetch(API + '/api/reports', {
+        headers:{ Authorization:'Bearer ' + token }
       });
 
-      if (res.status === 401 || res.status === 403){
+      if (res.status === 401 || res.status === 403) {
         sessionStorage.clear();
-        location.href = "login.html";
+        location.href = 'login.html';
         return;
       }
 
-      if (!res.ok){
-        msg.textContent = "Error al cargar reportes.";
+      if (!res.ok) {
+        msg.textContent = 'Error al cargar reportes.';
         return;
       }
 
       const data = await res.json();
-      if (!data.length){
-        msg.textContent = "Sin datos.";
+      if (!data.length) {
+        msg.textContent = 'Sin datos disponibles';
         return;
       }
 
       data.forEach(r => {
-        const tr = document.createElement("tr");
-        const estadoText = r.estado || "";
-        const cls = estadoClass(estadoText);
+        const tr = document.createElement('tr');
+        const estadoText = r.estado || '';
+        const estadoKey  = estadoText.toLowerCase().replace(/\s+/g,'_');
 
         tr.innerHTML = `
           <td>${r.reporte_id}</td>
-          <td>${esc(r.folio || "")}</td>
-          <td>${esc(r.titulo || "")}</td>
+          <td>${escapeHtml(r.folio || '')}</td>
+          <td>${escapeHtml(r.titulo || '')}</td>
+          <td><span class="status-badge status-${estadoKey}">${escapeHtml(estadoText)}</span></td>
+          <td>${escapeHtml(r.fecha_reporte || '')}</td>
+          <td><button class="btn" data-detail="${r.reporte_id}">Ver</button></td>
           <td>
-            <span class="status-badge ${cls}">
-              ${esc(estadoText || "N/D")}
-            </span>
-          </td>
-          <td>${esc(r.fecha_reporte || "")}</td>
-          <td>
-            <button class="btn" data-detail="${r.reporte_id}">Ver</button>
-          </td>
-          <td>
-            <button class="btn" data-resolve="${r.reporte_id}">Resolver</button>
+            <button class="btn" data-id="${r.reporte_id}">Resolver</button>
             <button class="btn" data-delete="${r.reporte_id}">Borrar</button>
           </td>
         `;
         tbody.appendChild(tr);
       });
 
-      // Listeners para botones
-      $$("button[data-detail]").forEach(btn => {
-        btn.onclick = () => showDetail(btn.getAttribute("data-detail"));
+      // Resolver
+      tbody.querySelectorAll('button[data-id]').forEach(btn => {
+        btn.addEventListener('click', async e => {
+          const id = e.target.getAttribute('data-id');
+          if (!confirm(`¿Marcar el reporte #${id} como resuelto?`)) return;
+
+          const res = await fetch(API + '/api/reports/' + id + '/resolve', {
+            method:'PATCH',
+            headers:{ Authorization:'Bearer ' + token }
+          });
+          if (res.ok) load();
+          else alert('No se pudo marcar como resuelto.');
+        });
       });
 
-      $$("button[data-resolve]").forEach(btn => {
-        btn.onclick = () => resolveReport(btn.getAttribute("data-resolve"));
+      // Detalle
+      tbody.querySelectorAll('button[data-detail]').forEach(btn => {
+        btn.addEventListener('click', () => showDetail(btn.getAttribute('data-detail')));
       });
 
-      $$("button[data-delete]").forEach(btn => {
-        btn.onclick = () => deleteReport(btn.getAttribute("data-delete"));
+      // Borrar
+      tbody.querySelectorAll('button[data-delete]').forEach(btn => {
+        btn.addEventListener('click', async e => {
+          const id = e.target.getAttribute('data-delete');
+          if (!confirm(`¿Borrar el reporte #${id}?`)) return;
+
+          const res = await fetch(API + '/api/reports/' + id, {
+            method:'DELETE',
+            headers:{ Authorization:'Bearer ' + token }
+          });
+
+          if (res.ok) load();
+          else alert('No se pudo borrar el reporte.');
+        });
       });
 
-    }catch(err){
-      console.error("[ADMIN] load error", err);
-      msg.textContent = "No se pudo conectar con la API.";
-    }
-  }
-
-  async function resolveReport(id){
-    if (!confirm("¿Marcar este reporte como RESUELTO?")) return;
-
-    try{
-      const res = await fetch(API + "/api/reports/" + id + "/resolve", {
-        method:"PATCH",
-        headers:{ Authorization:"Bearer " + token }
-      });
-
-      if (!res.ok){
-        alert("No se pudo marcar como resuelto.");
-        return;
-      }
-      loadReportes();
-    }catch(err){
-      console.error(err);
-      alert("Error al conectar con la API.");
-    }
-  }
-
-  async function deleteReport(id){
-    if (!confirm("¿Seguro que deseas borrar este reporte?")) return;
-
-    try{
-      const res = await fetch(API + "/api/reports/" + id, {
-        method:"DELETE",
-        headers:{ Authorization:"Bearer " + token }
-      });
-
-      if (!res.ok){
-        alert("No se pudo borrar el reporte.");
-        return;
-      }
-      loadReportes();
     }catch(err){
       console.error(err);
-      alert("Error al conectar con la API.");
+      msg.textContent = 'No se pudo conectar con la API.';
     }
   }
 
+  /* ------------------------------
+        EXPORTAR CSV
+  ------------------------------- */
+  function exportCSV(){
+    const rows = Array.from(tbody.querySelectorAll('tr'))
+      .map(tr => Array.from(tr.children).slice(0,5).map(td => td.textContent));
+
+    if (!rows.length) return alert('No hay datos.');
+
+    const header = ['ID','Folio','Título','Estado','Fecha'];
+    const csv = [header].concat(rows)
+      .map(r => r.map(x => JSON.stringify(x || '')).join(','))
+      .join('\n');
+
+    const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'reportes_cuidatec.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  /* ------------------------------
+        DETALLE DE REPORTE
+  ------------------------------- */
   async function showDetail(id){
-    detailContent.innerHTML = "Cargando...";
-    detailPanel.style.display = "flex";
+    detailContent.innerHTML = 'Cargando...';
+    detailPanel.style.display = 'flex';
 
     try{
-      const res = await fetch(API + "/api/reports/" + id + "/detail", {
-        headers:{ Authorization:"Bearer " + token }
+      const res = await fetch(API + '/api/reports/' + id + '/detail', {
+        headers:{ Authorization:'Bearer ' + token }
       });
 
       if (!res.ok){
-        detailContent.textContent = "Error cargando detalles.";
+        detailContent.textContent = 'Error cargando detalles.';
         return;
       }
 
       const payload = await res.json();
-      const info      = payload.info || {};
-      const historial = payload.historial || [];
+      const info         = payload.info || {};
+      const historial    = payload.historial || [];
       const asignaciones = payload.asignaciones || [];
 
-      let html = "";
-      html += `<p><b>Folio:</b> ${esc(info.folio || "")}</p>`;
-      html += `<p><b>Título:</b> ${esc(info.titulo || "")}</p>`;
-      html += `<p><b>Descripción:</b><br>${esc(info.descripcion || "")}</p>`;
-      html += `<p><b>Estado:</b> ${esc(info.estado || "")} · <b>Severidad:</b> ${esc(info.severidad || "")} · <b>Categoría:</b> ${esc(info.categoria || "")}</p>`;
-      html += `<p><b>Ubicación:</b> ${esc(info.calle || "")} ${esc(info.colonia || "")} ${esc(info.codigo_postal || "")}</p>`;
-      html += `<p><b>Referencias:</b> ${esc(info.referencias || "")}</p>`;
-      html += `<p><b>Reportante:</b> ${esc(info.reportante_nombre || "Anónimo")} (${esc(info.reportante_contacto || "N/D")})</p>`;
-      html += `<p><b>Fecha reporte:</b> ${esc(info.fecha_reporte || "")} · <b>Fecha cierre:</b> ${esc(info.fecha_cierre || "Sin cerrar")}</p>`;
+      let html = `
+        <p><b>Folio:</b> ${escapeHtml(info.folio || '')}</p>
+        <p><b>Título:</b> ${escapeHtml(info.titulo || '')}</p>
+        <p><b>Descripción:</b><br>${escapeHtml(info.descripcion || '')}</p>
+        <p><b>Estado:</b> ${escapeHtml(info.estado || '')} ·
+           <b>Severidad:</b> ${escapeHtml(info.severidad || '')} ·
+           <b>Categoría:</b> ${escapeHtml(info.categoria || '')}</p>
+        <p><b>Ubicación:</b> ${escapeHtml(info.calle || '')}
+           ${escapeHtml(info.colonia || '')}
+           ${escapeHtml(info.codigo_postal || '')}</p>
+        <p><b>Referencias:</b> ${escapeHtml(info.referencias || '')}</p>
+        <p><b>Reportante:</b> ${escapeHtml(info.reportante_nombre || 'Anónimo')}
+           (${escapeHtml(info.reportante_contacto || 'N/D')})</p>
+        <p><b>Fecha reporte:</b> ${escapeHtml(info.fecha_reporte || '')} ·
+           <b>Fecha cierre:</b> ${escapeHtml(info.fecha_cierre || 'Sin cerrar')}</p>
+        <hr><h4>Historial</h4>
+      `;
 
-      html += `<hr><h4>Historial de estados</h4>`;
       if (!historial.length){
-        html += `<p>Sin movimientos registrados.</p>`;
+        html += `<p>Sin historial registrado.</p>`;
       } else {
         html += `<ul>`;
         historial.forEach(h => {
-          html += `<li><b>${esc(h.fecha_cambio || "")}:</b> ${esc(h.estado_anterior || "N/A")} → ${esc(h.estado_nuevo || "")} (${esc(h.observaciones || "")})</li>`;
+          html += `<li><b>${escapeHtml(h.fecha_cambio || '')}:</b>
+                     ${escapeHtml(h.estado_anterior || 'N/A')}
+                     → ${escapeHtml(h.estado_nuevo || '')}
+                     (${escapeHtml(h.observaciones || '')})
+                   </li>`;
         });
         html += `</ul>`;
       }
 
       html += `<hr><h4>Asignaciones</h4>`;
       if (!asignaciones.length){
-        html += `<p>Sin asignaciones registradas.</p>`;
+        html += `<p>Sin asignaciones.</p>`;
       } else {
         html += `<ul>`;
         asignaciones.forEach(a => {
-          const nombre = a.estudiante_nombre || a.responsable || "Sin nombre";
-          const extra  = a.matricula ? ` [${a.matricula}]` : "";
-          html += `<li><b>${esc(a.fecha_asignacion || "")}:</b> ${esc(nombre + extra)} (${esc(a.correo || "")})</li>`;
+          const nombre = a.estudiante_nombre || a.responsable || 'Sin nombre';
+          const extra  = a.matricula ? ` [${a.matricula}]` : '';
+          html += `<li><b>${escapeHtml(a.fecha_asignacion || '')}:</b>
+                     ${escapeHtml(nombre + extra)}
+                     (${escapeHtml(a.correo || '')})
+                   </li>`;
         });
         html += `</ul>`;
       }
 
+      // Formulario de asignación
+      html += `
+        <hr>
+        <h4>Asignar brigada / responsable</h4>
+        <div id="assignArea">
+          <p class="muted">Selecciona una brigada o escribe un responsable.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <select id="assignStudent" style="flex:1;min-width:200px"></select>
+            <input id="assignResponsable" placeholder="Responsable (opcional)" style="flex:1;min-width:200px">
+          </div>
+          <button class="btn" id="assignBtn">Asignar</button>
+          <p id="assignMsg" class="muted"></p>
+        </div>
+      `;
+
       detailContent.innerHTML = html;
       detailTitle.textContent = `Reporte #${info.reporte_id || id}`;
 
+      await fillStudents(id);
+
     }catch(err){
       console.error(err);
-      detailContent.textContent = "Error cargando detalles.";
+      detailContent.textContent = 'Error al mostrar detalle.';
     }
   }
 
-  function exportCSV(){
-    const rows = Array.from(tbody.querySelectorAll("tr"))
-      .map(tr => Array.from(tr.children).slice(0,5).map(td => td.textContent));
-    if (!rows.length){
-      alert("No hay datos para exportar.");
+  /* ------------------------------
+        LLENAR SELECT DE BRIGADAS
+  ------------------------------- */
+  async function fillStudents(reporteId){
+    const sel   = document.getElementById('assignStudent');
+    const msgEl = document.getElementById('assignMsg');
+    const btn   = document.getElementById('assignBtn');
+    const resp  = document.getElementById('assignResponsable');
+
+    sel.innerHTML = '<option value="">(Selecciona brigada)</option>';
+
+    try{
+      const res = await fetch(API + '/api/students', {
+        headers:{ Authorization:'Bearer ' + token }
+      });
+
+      if (!res.ok){
+        msgEl.textContent = 'No se pudieron cargar brigadas.';
+        return;
+      }
+
+      const data = await res.json();
+      data.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.estudiante_id;
+        opt.textContent = `${s.nombre} (${s.matricula})`;
+        sel.appendChild(opt);
+      });
+
+    }catch(e){
+      console.error(e);
+      msgEl.textContent = 'Error al cargar brigadas.';
       return;
     }
-    const header = ["ID","Folio","Título","Estado","Fecha"];
-    const csv = [header].concat(rows)
-      .map(r => r.map(x => JSON.stringify(x || "")).join(","))
-      .join("\n");
 
-    const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "reportes_cuidatec.csv";
-    a.click();
-    URL.revokeObjectURL(a.href);
+    btn.onclick = async () => {
+      msgEl.textContent = '';
+      const estudiante_id = sel.value ? Number(sel.value) : null;
+      const responsable   = resp.value.trim() || null;
+
+      if (!estudiante_id && !responsable){
+        msgEl.textContent = 'Selecciona brigada o escribe responsable.';
+        return;
+      }
+
+      const res = await fetch(API + '/api/reports/' + reporteId + '/assign', {
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          Authorization:'Bearer ' + token
+        },
+        body: JSON.stringify({ estudiante_id, responsable })
+      });
+
+      if (res.ok){
+        msgEl.textContent = 'Asignación registrada.';
+        showDetail(reporteId);
+      } else {
+        msgEl.textContent = 'No se pudo asignar.';
+      }
+    };
   }
 
   // Inicial
-  loadReportes();
-})();
+  load();
+});
 </script>
+
 </body>
 </html>
