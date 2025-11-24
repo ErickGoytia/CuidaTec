@@ -5,113 +5,103 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Login — CuidaTec</title>
   <link rel="stylesheet" href="assets/css/styles.css">
-  <link rel="stylesheet" href="https://unpkg.com/aos@2.3.4/dist/aos.css">
-  <style>
-    .login-wrap { min-height: 70vh; display: grid; place-items: center; padding: 24px; }
-    .login-card { max-width: 520px; width: 100%; }
-    .grid-2-login { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .grid-2-login label { display:block; }
-    .grid-2-login input { width:100%; }
-    @media (max-width: 640px) {
-      .grid-2-login { grid-template-columns: 1fr; }
-    }
-  </style>
 </head>
 <body>
-  <main class="container login-wrap">
-    <div class="card login-card" data-aos="zoom-in">
-      <h2 style="margin-top:0">Iniciar sesión</h2>
+  <header class="container header">
+    <div class="brand">
+      <div class="logo">💧</div>
+      <a href="index.html" class="brand-name">CuidaTec</a>
+    </div>
+    <nav class="nav">
+      <a href="index.html">Inicio</a>
+      <a href="reportar.html">Reportar</a>
+      <a href="calculadora.html">Calculadora</a>
+      <a href="consejos.html">Consejos</a>
+      <a href="contacto.html">Contacto</a>
+    </nav>
+    <div class="header-blob"></div>
+  </header>
 
-      <form id="loginForm" class="form" autocomplete="on">
-        <div class="grid-2-login" style="align-items:end">
-          <label>Usuario
-            <input id="user" name="user" required placeholder="admin o usuario" autofocus>
-          </label>
-          <label>Contraseña
-            <input id="pass" name="pass" type="password" required placeholder="teclag">
-          </label>
-        </div>
+  <main class="container">
+    <div class="card" style="max-width:480px;margin:40px auto">
+      <h1>Iniciar sesión</h1>
 
-        <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
-          <button class="btn primary" type="submit">Entrar</button>
-          <button class="btn" type="button" id="demoUser">Demo usuario</button>
-          <button class="btn" type="button" id="demoAdmin">Demo admin</button>
-        </div>
+      <div class="form">
+        <label>Usuario
+          <input id="user" autocomplete="username">
+        </label>
+        <label>Contraseña
+          <input id="pass" type="password" autocomplete="current-password">
+        </label>
 
-        <p id="msg" class="muted" style="margin-top:10px"></p>
-      </form>
+        <button class="btn primary" id="btnLogin">Entrar</button>
+        <button class="btn" id="btnDemoUser">Demo usuario</button>
+        <button class="btn" id="btnDemoAdmin">Demo admin</button>
+
+        <p id="msg" class="muted"></p>
+      </div>
     </div>
   </main>
 
   <script src="assets/js/main.js"></script>
-  <script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script>
   <script>
-    document.addEventListener('DOMContentLoaded', () => AOS.init({ once:true, duration:700, easing:'ease-out' }));
+  (function () {
+    const API = window.API_BASE;
+    const $ = id => document.getElementById(id);
 
-    const API = (window.API_BASE && window.API_BASE.replace('https://','http://')) || 'http://127.0.0.1:9090';
+    console.log('[LOGIN] API_BASE =', API);
 
-    const form   = document.getElementById('loginForm');
-    const msg    = document.getElementById('msg');
-    const btnU   = document.getElementById('demoUser');
-    const btnA   = document.getElementById('demoAdmin');
-    const inpU   = document.getElementById('user');
-    const inpP   = document.getElementById('pass');
+    const user = $('user');
+    const pass = $('pass');
+    const msg  = $('msg');
 
-    btnU.onclick = () => { inpU.value = 'usuario'; inpP.value = 'teclag'; doLogin('usuario','teclag'); };
-    btnA.onclick = () => { inpU.value = 'admin';   inpP.value = 'teclag'; doLogin('admin','teclag'); };
+    $('btnDemoUser').onclick = () => {
+      user.value = 'usuario';
+      pass.value = 'teclag';
+    };
+    $('btnDemoAdmin').onclick = () => {
+      user.value = 'admin';
+      pass.value = 'teclag';
+    };
 
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const u = inpU.value;
-      const p = inpP.value;
-      doLogin(u, p);
-    });
-
-    async function doLogin(u, p){
+    $('btnLogin').onclick = async () => {
       msg.textContent = '';
-      const payload = {
-        username: String(u || '').trim(),
-        password: String(p || '')
-      };
-      console.log('[login] payload que se envía:', payload);
+      const username = user.value.trim();
+      const password = pass.value.trim();
 
-      if (!payload.username || !payload.password) {
-        msg.textContent = 'Escribe usuario y contraseña';
+      if (!username || !password) {
+        msg.textContent = 'Escribe usuario y contraseña.';
         return;
       }
 
-      try{
-        const res = await fetch(API + '/api/login', {
-          method:'POST',
-          headers:{ 'Content-Type':'application/json' },
-          body: JSON.stringify(payload)
+      try {
+        const res = await fetch(API.replace(/\/+$/, '') + '/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
         });
 
-        const text = await res.text();
-        console.log('[login] status', res.status, text);
-
         if (!res.ok) {
-          msg.textContent = (res.status === 401)
-            ? 'Credenciales inválidas'
-            : 'No se pudo conectar con la API';
+          const error = await res.json().catch(() => ({}));
+          msg.textContent = error.error || 'Credenciales inválidas.';
           return;
         }
 
-        const j = JSON.parse(text);
-        if (!j.token || !j.role) {
-          msg.textContent = 'Respuesta inválida del servidor';
-          console.warn('[login] payload raro', j);
-          return;
-        }
+        const data = await res.json();
+        sessionStorage.setItem('token', data.token);
+        sessionStorage.setItem('role',  data.role);
 
-        sessionStorage.setItem('token', j.token);
-        sessionStorage.setItem('role',  j.role);
-        location.href = (j.role === 'admin') ? 'admin.html' : 'index.html';
-      }catch(err){
-        console.error('[login] error', err);
+        if (data.role === 'admin') {
+          location.href = 'admin.html';
+        } else {
+          location.href = 'index.html';
+        }
+      } catch (e) {
+        console.error('[login] error', e);
         msg.textContent = 'No se pudo conectar con la API';
       }
-    }
+    };
+  })();
   </script>
 </body>
 </html>
