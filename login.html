@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Login — CuidaTec</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+  <header class="container header">
+    <div class="brand">
+      <div class="logo">💧</div>
+      <a href="index.html" class="brand-name">CuidaTec</a>
+    </div>
+    <nav class="nav">
+      <a href="index.html">Inicio</a>
+      <a href="reportar.html">Reportar</a>
+      <a href="calculadora.html">Calculadora</a>
+      <a href="consejos.html">Consejos</a>
+      <a href="contacto.html">Contacto</a>
+    </nav>
+    <div class="header-blob"></div>
+  </header>
+ 
+  <main class="container">
+    <div class="card" style="max-width:480px;margin:40px auto">
+      <h1>Iniciar sesión</h1>
+
+      <div class="form">
+        <label>Usuario
+          <input id="user" autocomplete="username">
+        </label>
+        <label>Contraseña
+          <input id="pass" type="password" autocomplete="current-password">
+        </label>
+
+        <button class="btn primary" id="btnLogin">Entrar</button>
+        <button class="btn" id="btnDemoUser">Demo usuario</button>
+        <button class="btn" id="btnDemoAdmin">Demo admin</button>
+
+        <p id="msg" class="muted"></p>
+      </div>
+    </div>
+  </main>
+
+  <script src="assets/js/main.js"></script>
+  <script>
+  (function () {
+    const API = window.API_BASE;
+    const $ = id => document.getElementById(id);
+
+    console.log('[LOGIN] API_BASE =', API);
+
+    const user = $('user');
+    const pass = $('pass');
+    const msg  = $('msg');
+
+    $('btnDemoUser').onclick = () => {
+      user.value = 'usuario';
+      pass.value = 'teclag';
+    };
+    $('btnDemoAdmin').onclick = () => {
+      user.value = 'admin';
+      pass.value = 'teclag';
+    };
+
+    $('btnLogin').onclick = async () => {
+      msg.textContent = '';
+      const username = user.value.trim();
+      const password = pass.value.trim();
+
+      if (!username || !password) {
+        msg.textContent = 'Escribe usuario y contraseña.';
+        return;
+      }
+
+      try {
+        const res = await fetch(API.replace(/\/+$/, '') + '/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+
+        if (!res.ok) {
+          const error = await res.json().catch(() => ({}));
+          msg.textContent = error.error || 'Credenciales inválidas.';
+          return;
+        }
+
+        const data = await res.json();
+        sessionStorage.setItem('token', data.token);
+        sessionStorage.setItem('role',  data.role);
+
+        if (data.role === 'admin') {
+          location.href = 'admin.html';
+        } else {
+          location.href = 'index.html';
+        }
+      } catch (e) {
+        console.error('[login] error', e);
+        msg.textContent = 'No se pudo conectar con la API';
+      }
+    };
+  })();
+  </script>
+</body>
+</html>
