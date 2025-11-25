@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Admin — CuidaTec</title>
+
+  <!-- Estilos globales del sitio -->
   <link rel="stylesheet" href="assets/css/styles.css">
   <link rel="stylesheet" href="https://unpkg.com/aos@2.3.4/dist/aos.css">
 
@@ -20,7 +22,8 @@
       border:1px solid rgba(255,255,255,.08);
       background:rgba(10,20,30,.9);
     }
-    .table-admin th, .table-admin td{
+    .table-admin th,
+    .table-admin td{
       font-size:13px;
       vertical-align:middle;
     }
@@ -34,17 +37,20 @@
       border:1px solid rgba(148,163,184,0.4);
       background:rgba(15,23,42,0.9);
     }
-    .status-nuevo, .status-pendiente{
+    .status-nuevo,
+    .status-pendiente{
       border-color:rgba(59,130,246,0.7);
       background:rgba(37,99,235,0.25);
       color:#dbeafe;
     }
-    .status-en_proceso, .status-en-proceso{
+    .status-en_proceso,
+    .status-en-proceso{
       border-color:rgba(234,179,8,0.8);
       background:rgba(234,179,8,0.25);
       color:#facc15;
     }
-    .status-resuelto, .status-cerrado{
+    .status-resuelto,
+    .status-cerrado{
       border-color:rgba(52,211,153,0.85);
       background:rgba(16,185,129,0.25);
       color:#bbf7d0;
@@ -104,7 +110,7 @@
   </div>
 </main>
 
-<!-- PANEL DETALLE -->
+<!-- Panel flotante de detalle -->
 <div id="detailPanel" style="
   position:fixed;
   inset:0;
@@ -127,11 +133,11 @@
       <h3 id="detailTitle" style="margin:0">Detalle del reporte</h3>
       <button class="btn" id="detailClose">Cerrar</button>
     </div>
-
     <div id="detailContent" class="muted" style="font-size:13px"></div>
   </div>
 </div>
 
+<!-- Scripts globales -->
 <script src="assets/js/main.js"></script>
 <script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script>
 
@@ -185,11 +191,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }[c]));
   }
 
-  // Helper para leer JSON con control de errores
+  // ==========================
+  //  Helper fetchJson (con header ngrok)
+  // ==========================
   async function fetchJson(url, options = {}) {
+    const baseHeaders = { 'ngrok-skip-browser-warning': 'true' };
+    options.headers = { ...(options.headers || {}), ...baseHeaders };
+
     try {
       const res  = await fetch(url, options);
-      const text = await res.text();           // leemos siempre texto
+      const text = await res.text();
 
       if (!res.ok) {
         console.error('[fetchJson] HTTP', res.status, text);
@@ -203,7 +214,6 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error('[fetchJson] Respuesta NO JSON desde', url, '=>', text);
         return { ok:false, status:res.status, error:'json' };
       }
-
     } catch (err) {
       console.error('[fetchJson] Error de red', err);
       return { ok:false, status:0, error:'network' };
@@ -239,10 +249,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
       tr.innerHTML = `
         <td>${rp.reporte_id}</td>
-        <td>${rp.folio || ''}</td>
+        <td>${escapeHtml(rp.folio || '')}</td>
         <td>${escapeHtml(rp.titulo || '')}</td>
-        <td><span class="status-badge status-${estadoKey}">${estadoText}</span></td>
-        <td>${rp.fecha_reporte || ''}</td>
+        <td><span class="status-badge status-${estadoKey}">${escapeHtml(estadoText)}</span></td>
+        <td>${escapeHtml(rp.fecha_reporte || '')}</td>
         <td><button class="btn" data-detail="${rp.reporte_id}">Ver</button></td>
         <td>
           <button class="btn" data-id="${rp.reporte_id}">Resolver</button>
@@ -256,11 +266,18 @@ document.addEventListener('DOMContentLoaded', () => {
     tbody.querySelectorAll('button[data-id]').forEach(btn => {
       btn.addEventListener('click', async e => {
         const id = e.target.getAttribute('data-id');
+        if (!confirm(`¿Marcar el reporte #${id} como resuelto?`)) return;
+
         const res = await fetch(API + '/api/reports/' + id + '/resolve', {
           method:'PATCH',
-          headers:{ Authorization:'Bearer ' + token }
+          headers:{
+            Authorization:'Bearer ' + token,
+            'ngrok-skip-browser-warning':'true'
+          }
         });
+
         if (res.ok) load();
+        else alert('No se pudo marcar como resuelto.');
       });
     });
 
@@ -269,7 +286,7 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.addEventListener('click', () => showDetail(btn.getAttribute('data-detail')));
     });
 
-    // Borrar (soft delete)
+    // Borrar
     tbody.querySelectorAll('button[data-delete]').forEach(btn => {
       btn.addEventListener('click', async e => {
         const id = e.target.getAttribute('data-delete');
@@ -277,7 +294,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const res = await fetch(API + '/api/reports/' + id, {
           method:'DELETE',
-          headers:{ Authorization:'Bearer ' + token }
+          headers:{
+            Authorization:'Bearer ' + token,
+            'ngrok-skip-browser-warning':'true'
+          }
         });
 
         if (res.ok) load();
@@ -306,7 +326,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'reportes.csv';
+    a.download = 'reportes_cuidatec.csv';
     a.click();
     URL.revokeObjectURL(a.href);
   }
@@ -333,14 +353,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const asignaciones = payload.asignaciones || [];
 
     let html = `
-      <p><b>Folio:</b> ${info.folio || ''}</p>
+      <p><b>Folio:</b> ${escapeHtml(info.folio || '')}</p>
       <p><b>Título:</b> ${escapeHtml(info.titulo || '')}</p>
       <p><b>Descripción:</b><br>${escapeHtml(info.descripcion || '')}</p>
-      <p><b>Estado:</b> ${info.estado || ''} · <b>Severidad:</b> ${info.severidad || ''} · <b>Categoría:</b> ${info.categoria || ''}</p>
-      <p><b>Ubicación:</b> ${escapeHtml(info.calle || '')} ${escapeHtml(info.colonia || '')} ${escapeHtml(info.codigo_postal || '')}</p>
+      <p><b>Estado:</b> ${escapeHtml(info.estado || '')} ·
+         <b>Severidad:</b> ${escapeHtml(info.severidad || '')} ·
+         <b>Categoría:</b> ${escapeHtml(info.categoria || '')}</p>
+      <p><b>Ubicación:</b> ${escapeHtml(info.calle || '')}
+         ${escapeHtml(info.colonia || '')}
+         ${escapeHtml(info.codigo_postal || '')}</p>
       <p><b>Referencias:</b> ${escapeHtml(info.referencias || '')}</p>
-      <p><b>Reportante:</b> ${escapeHtml(info.reportante_nombre || 'Anónimo')} (${escapeHtml(info.reportante_contacto || 'N/D')})</p>
-      <p><b>Fecha reporte:</b> ${info.fecha_reporte || ''} · <b>Fecha cierre:</b> ${info.fecha_cierre || 'Sin cerrar'}</p>
+      <p><b>Reportante:</b> ${escapeHtml(info.reportante_nombre || 'Anónimo')}
+         (${escapeHtml(info.reportante_contacto || 'N/D')})</p>
+      <p><b>Fecha reporte:</b> ${escapeHtml(info.fecha_reporte || '')} ·
+         <b>Fecha cierre:</b> ${escapeHtml(info.fecha_cierre || 'Sin cerrar')}</p>
       <hr><h4>Historial</h4>
     `;
 
@@ -349,7 +375,11 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       html += `<ul>`;
       historial.forEach(h => {
-        html += `<li><b>${h.fecha_cambio}:</b> ${h.estado_anterior || 'N/A'} → ${h.estado_nuevo || ''} (${escapeHtml(h.observaciones || '')})</li>`;
+        html += `<li><b>${escapeHtml(h.fecha_cambio || '')}:</b>
+                   ${escapeHtml(h.estado_anterior || 'N/D')}
+                   → ${escapeHtml(h.estado_nuevo || '')}
+                   (${escapeHtml(h.observaciones || '')})
+                 </li>`;
       });
       html += `</ul>`;
     }
@@ -362,12 +392,15 @@ document.addEventListener('DOMContentLoaded', () => {
       asignaciones.forEach(a => {
         const nombre = a.estudiante_nombre || a.responsable || 'Sin nombre';
         const extra  = a.matricula ? ` [${a.matricula}]` : '';
-        html += `<li><b>${a.fecha_asignacion}:</b> ${escapeHtml(nombre + extra)} (${escapeHtml(a.correo || '')})</li>`;
+        html += `<li><b>${escapeHtml(a.fecha_asignacion || '')}:</b>
+                   ${escapeHtml(nombre + extra)}
+                   (${escapeHtml(a.correo || '')})
+                 </li>`;
       });
       html += `</ul>`;
     }
 
-    // Zona de asignar brigada
+    // Zona de asignar brigada / responsable
     html += `
       <hr>
       <h4>Asignar brigada / responsable</h4>
@@ -429,7 +462,8 @@ document.addEventListener('DOMContentLoaded', () => {
         method:'POST',
         headers:{
           'Content-Type':'application/json',
-          Authorization:'Bearer ' + token
+          Authorization:'Bearer ' + token,
+          'ngrok-skip-browser-warning':'true'
         },
         body: JSON.stringify({ estudiante_id, responsable })
       });
@@ -443,7 +477,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  // Arranque
+  // Arranque inicial
   load();
 });
 </script>
